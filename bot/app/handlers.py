@@ -21,7 +21,12 @@ async def start_analysis(message: Message):
 # обработка опции "Персональные рекомендации"
 @router.message(lambda message: message.text == "Персональные рекомендации")
 async def personal_rec(message: Message):
-    await message.answer("Веберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
+    await message.answer("Выберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
+
+# обработка опции "История анализов"
+@router.message(lambda message: message.text == "История анализов")
+async def analysis_history(message: Message):
+    await message.answer("Здесь будет ваша история анализов (функционал пока не реализован)")
 
 # обработка команды /help
 @router.message(Command('help')) 
