@@ -1,13 +1,17 @@
+import app.keyboards as kb
+
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
+
 
 router = Router()
 
 # обработка команды /start
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?')
+    await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
+                         reply_markup=kb.main_menu)
 
 # обработка команды /help
 @router.message(Command('help')) 
