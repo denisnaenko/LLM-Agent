@@ -2,7 +2,7 @@ import asyncio
 import logging
 import os
 
-from aiogram import Bot, Dispatcher
+from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message
 from dotenv import load_dotenv
@@ -24,6 +24,11 @@ async def cmd_start(message: Message):
 @dp.message(Command('help')) 
 async def get_help(message: Message):
     await message.answer("Это команда /help")
+
+# обработка фотографий
+@dp.message(F.photo)
+async def get_photo(message: Message):
+    await message.answer(f"ID фото: {message.photo[-1].file_id}")
 
 
 async def main():
