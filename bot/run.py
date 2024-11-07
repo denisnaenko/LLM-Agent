@@ -2,10 +2,9 @@ import asyncio
 import logging
 import os
 
-from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message
+from aiogram import Bot, Dispatcher
 from dotenv import load_dotenv
+from app.handlers import router
 
 # загружаем токен из .env
 load_dotenv()
@@ -15,23 +14,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# обработка команды /start
-@dp.message(CommandStart())
-async def cmd_start(message: Message):
-    await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?')
-
-# обработка команды /help
-@dp.message(Command('help')) 
-async def get_help(message: Message):
-    await message.answer("Это команда /help")
-
-# обработка фотографий
-@dp.message(F.photo)
-async def get_photo(message: Message):
-    await message.answer(f"ID фото: {message.photo[-1].file_id}")
-
-
 async def main():
+    dp.include_router(router)
     await dp.start_polling(bot)
 
 
