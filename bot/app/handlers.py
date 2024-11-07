@@ -28,6 +28,11 @@ async def personal_rec(message: Message):
 async def analysis_history(message: Message):
     await message.answer("Здесь будет ваша история анализов (функционал пока не реализован)")
 
+# обработка опции "Настройки"
+@router.message(lambda message: message.text == "Настройки")
+async def settings(message: Message):
+    await message.answer("Настройки:", reply_markup=kb.settings_menu)
+
 # обработка команды /help
 @router.message(Command('help')) 
 async def get_help(message: Message):

@@ -21,3 +21,10 @@ personal_rec_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Получить рекомендации", callback_data="get_rec")],
     [InlineKeyboardButton(text="Назад в меню", callback_data="back_to_main")]]
 )
+
+# Inline меню для опции "Настройки"
+settings_menu = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="Обновить информацию о коже", callback_data="update_skin_info")],
+    [InlineKeyboardButton(text="Включить/выключить уведомления", callback_data="toggle_notifications")],
+    [InlineKeyboardButton(text="Удалить историю анализов", callback_data="delete_history")]]
+)
