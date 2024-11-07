@@ -18,7 +18,7 @@ dp = Dispatcher()
 # обработка команды /start
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
-    await message.answer('Бот запущен!')
+    await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?')
 
 # обработка команды /help
 @dp.message(Command('help')) 
