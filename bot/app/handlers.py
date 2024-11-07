@@ -13,9 +13,15 @@ async def cmd_start(message: Message):
     await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
                          reply_markup=kb.main_menu)
 
+# обработка опции "Начать анализ"
 @router.message(lambda message: message.text == "Начать анализ")
 async def start_analysis(message: Message):
     await message.answer("Выберите действие для анализа состава:", reply_markup=kb.analysis_menu)
+
+# обработка опции "Персональные рекомендации"
+@router.message(lambda message: message.text == "Персональные рекомендации")
+async def personal_rec(message: Message):
+    await message.answer("Веберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
 
 # обработка команды /help
 @router.message(Command('help')) 
