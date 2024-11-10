@@ -40,7 +40,12 @@ async def handle_photo(message: Message, state: FSMContext):
     await state.clear()
 
 # обработка опции "Начать анализ" -> "Использовать текстовый ввод"
-
+@router.callback_query(lambda c: c.data == "text_input")
+async def text_input(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.answer("Введите текст состава для анализа")
+    await callback.answer()
+    
 # обработка перехода на другие опции с 'Начать анализ' и сброс состояния
 @router.message(F.text)
 async def handle_other_commands(message: Message, state: FSMContext):
