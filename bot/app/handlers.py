@@ -6,6 +6,8 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
+from .skin_test import determine_skin_type
+
 
 
 router = Router()
@@ -13,6 +15,15 @@ router = Router()
 # создание состояние для загрузки фото
 class UploadPhotoState(StatesGroup):
     waiting_for_photo = State()
+
+# создание состояния для теста на тип кожи
+class SkinTypeTest(StatesGroup):
+    question_1 = State()
+    question_2 = State()
+    question_3 = State()
+    
+    calculating_result = State()
+
 
 # обработка команды /start
 @router.message(CommandStart())
@@ -66,15 +77,46 @@ async def personal_rec(message: Message):
 
 # обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи"
 @router.callback_query(lambda c: c.data == "get_skin_type")
-async def get_skin_type(callback: CallbackQuery):
+async def get_skin_type(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Пройдите тест, чтобы определить ваш тип кожи:")
-    """
-    # функционал теста
-    ....
+    await callback.message.answer("Вопрос 1: Как ваша кожа реагирует на жирные кремы? (a), (b), (c)",
+                                  reply_markup=kb.response_options)
+    await state.set_state(SkinTypeTest.question_1)    
 
-    await.callback.message.answer("Ваш тип кожи: ", test_result)
-    """
+# обработка ответа на вопрос 1
+@router.callback_query(SkinTypeTest.question_1)
+async def handle_question_1(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(answer_1=callback.data)
+    await callback.message.answer("Вопрос 2: Часто ли у вас появляются высыпания? (a), (b), (c)",
+                                  reply_markup=kb.response_options)
+    await state.set_state(SkinTypeTest.question_2)
 
+# обработка ответа на вопрос 2
+@router.callback_query(SkinTypeTest.question_2)
+async def handle_question_2(callback: CallbackQuery, state: FSMContext):
+    print(callback.data)
+    await state.update_data(answer_2=callback.data)
+    await callback.message.answer("Вопрос 3: Ваша кожа чувствительная? (a), (b), (c)",
+                                  reply_markup=kb.response_options)
+    await state.set_state(SkinTypeTest.question_3)
+
+# обработка ответа на вопрос 3
+@router.callback_query(SkinTypeTest.question_3)
+async def handle_question_3(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(answer_3=callback.data)
+    await callback.message.answer("Спасибо за ответы! Пожалуйста, подождите, пока я анализирую ваш тип кожи...")
+    await state.set_state(SkinTypeTest.calculating_result)
+                                  
+    # получение данных из состояния
+    user_data = await state.get_data()
+    skin_type = determine_skin_type(user_data)
+
+    # сохранение результата в бд
+    await rq.set_skin_type(callback.from_user.id, skin_type)
+
+    # завершение теста
+    await callback.message.answer(f'Ваш тип кожи: {skin_type}')
+    await state.clear()
 
 # обработка опции "Персональные рекомендации" -> "Получить рекомендации"
 @router.callback_query(lambda c: c.data == "get_recommendations")
