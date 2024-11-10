@@ -2,10 +2,16 @@ import app.keyboards as kb
 
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 
 
 router = Router()
+
+# создание состояние для загрузки фото
+class UploadPhotoState(StatesGroup):
+    waiting_for_photo = State()
 
 # обработка команды /start
 @router.message(CommandStart())
@@ -20,9 +26,17 @@ async def start_analysis(message: Message):
 
 # обработка опции "Начать анализ" -> "Загрузить фото состава"
 @router.callback_query(lambda c: c.data == "upload_photo")
-async def upload_photo(callback: CallbackQuery):
+async def upload_photo(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Загрузите фото состава для анализа")
+    await state.set_state(UploadPhotoState.waiting_for_photo)
     await callback.answer()
+
+# Обработка загруженного фото в состоянии 'waiting_for_photo'
+@router.message(UploadPhotoState.waiting_for_photo, F.photo)
+async def handle_photo(message: Message, state: FSMContext):
+    await message.answer("Функционал анализа фото ещё не реализован")
+    await state.clear()
+
 
 # обработка опции "Начать анализ" -> "Использовать текстовый ввод"
 
