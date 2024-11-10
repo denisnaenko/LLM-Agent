@@ -15,13 +15,15 @@ class UploadPhotoState(StatesGroup):
 
 # обработка команды /start
 @router.message(CommandStart())
-async def cmd_start(message: Message):
+async def cmd_start(message: Message, state: FSMContext):
+    await state.clear()
     await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
                          reply_markup=kb.main_menu)
 
 # обработка опции "Начать анализ"
 @router.message(lambda message: message.text == "Начать анализ")
-async def start_analysis(message: Message):
+async def start_analysis(message: Message, state: FSMContext):
+    await state.clear()
     await message.answer("Выберите действие для анализа состава:", reply_markup=kb.analysis_menu)
 
 # обработка опции "Начать анализ" -> "Загрузить фото состава"
@@ -31,14 +33,24 @@ async def upload_photo(callback: CallbackQuery, state: FSMContext):
     await state.set_state(UploadPhotoState.waiting_for_photo)
     await callback.answer()
 
-# Обработка загруженного фото в состоянии 'waiting_for_photo'
+# обработка загруженного фото в состоянии 'waiting_for_photo'
 @router.message(UploadPhotoState.waiting_for_photo, F.photo)
 async def handle_photo(message: Message, state: FSMContext):
     await message.answer("Функционал анализа фото ещё не реализован")
     await state.clear()
 
-
 # обработка опции "Начать анализ" -> "Использовать текстовый ввод"
+
+# обработка перехода на другие опции с 'Начать анализ' и сброс состояния
+@router.message(F.text)
+async def handle_other_commands(message: Message, state: FSMContext):
+    await state.clear()
+    if message.text == "Персональные рекомендации":
+        await personal_rec(message)
+    elif message.text == "История анализов":
+        await analysis_history(message)
+    elif message.text == "Настройки":
+        await settings(message)
 
 # обработка опции "Персональные рекомендации"
 @router.message(lambda message: message.text == "Персональные рекомендации")
