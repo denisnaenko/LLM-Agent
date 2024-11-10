@@ -29,6 +29,6 @@ settings_menu = InlineKeyboardMarkup(inline_keyboard=[
 
 # Inline меню для "Персональные рекомендации" -> "Узнать свой тип кожи"
 response_options = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="a", callback_data="a"),
-    InlineKeyboardButton(text="b", callback_data="b"),
-    InlineKeyboardButton(text="c", callback_data="c")]])
+    [InlineKeyboardButton(text="A", callback_data="a"),
+    InlineKeyboardButton(text="B", callback_data="b"),
+    InlineKeyboardButton(text="C", callback_data="c")]])
