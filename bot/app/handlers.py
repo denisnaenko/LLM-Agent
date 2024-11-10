@@ -65,6 +65,14 @@ async def personal_rec(message: Message):
 # обработка опции "Персональные рекомендации" -> "Ввести данные о коже"
 
 # обработка опции "Персональные рекомендации" -> "Получить рекомендации"
+@router.callback_query(lambda c: c.data == "get_recommendations")
+async def get_recommendations(callback: CallbackQuery):
+    await callback.message.answer("Вот персональные рекомендации для ухода за вашим типом кожи:")
+    """
+    (место для реализации функционала)
+    ...
+    """
+    await callback.answer()
 
 # обработка опции "История анализов"
 @router.message(lambda message: message.text == "История анализов")

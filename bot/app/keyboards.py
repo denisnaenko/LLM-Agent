@@ -17,7 +17,7 @@ analysis_menu = InlineKeyboardMarkup(inline_keyboard=[
 # Inline меню для опции "Персональные рекомендации"
 personal_rec_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Ввести данные о коже", callback_data="enter_skin_data")],
-    [InlineKeyboardButton(text="Получить рекомендации", callback_data="get_rec")]]
+    [InlineKeyboardButton(text="Получить рекомендации", callback_data="get_recommendations")]]
 )
 
 # Inline меню для опции "Настройки"
