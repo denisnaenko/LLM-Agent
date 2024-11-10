@@ -1,6 +1,6 @@
 import app.keyboards as kb
 
-from aiogram import F, Router
+from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery
 
@@ -18,7 +18,11 @@ async def cmd_start(message: Message):
 async def start_analysis(message: Message):
     await message.answer("Выберите действие для анализа состава:", reply_markup=kb.analysis_menu)
 
-# обработка опции "Начать анализ" -> "Загрузить фото упаковки"
+# обработка опции "Начать анализ" -> "Загрузить фото состава"
+@router.callback_query(lambda c: c.data == "upload_photo")
+async def upload_photo(callback: CallbackQuery):
+    await callback.message.answer("Загрузите фото состава для анализа")
+    await callback.answer()
 
 # обработка опции "Начать анализ" -> "Использовать текстовый ввод"
 
@@ -48,6 +52,8 @@ async def settings(message: Message):
 # обработка опции "Настройки" -> "Удалить историю анализов"
 
 # обработка опции ... -> "Назад в меню"
+
+
 
 # обработка команды /help
 @router.message(Command('help')) 
