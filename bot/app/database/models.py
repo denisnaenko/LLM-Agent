@@ -14,7 +14,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     tg_id = mapped_column(BigInteger)
-    skin_type: Mapped[str] = mapped_column(String(50))
+    skin_type: Mapped[str] = mapped_column(String(50), nullable=True)
 
 async def async_main():
     async with engine.begin() as conn:
