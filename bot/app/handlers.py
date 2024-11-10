@@ -82,10 +82,6 @@ async def settings(message: Message):
 
 # обработка опции "Настройки" -> "Удалить историю анализов"
 
-# обработка опции ... -> "Назад в меню"
-
-
-
 # обработка команды /help
 @router.message(Command('help')) 
 async def get_help(message: Message):
