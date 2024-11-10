@@ -79,7 +79,7 @@ async def personal_rec(message: Message):
 @router.callback_query(lambda c: c.data == "get_skin_type")
 async def get_skin_type(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Пройдите тест, чтобы определить ваш тип кожи:")
-    await callback.message.answer("Вопрос 1: Как ваша кожа реагирует на жирные кремы? (a), (b), (c)",
+    await callback.message.answer("Вопрос 1: Как ваша кожа реагирует на жирные кремы?\n\nA - Начинает Блестеть\nB - Нормально\nC - Становится сухой",
                                   reply_markup=kb.response_options)
     await state.set_state(SkinTypeTest.question_1)    
 
@@ -87,7 +87,7 @@ async def get_skin_type(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(SkinTypeTest.question_1)
 async def handle_question_1(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_1=callback.data)
-    await callback.message.answer("Вопрос 2: Часто ли у вас появляются высыпания? (a), (b), (c)",
+    await callback.message.answer("Вопрос 2: Часто ли у вас появляются высыпания?\n\nA - Да\nB - Иногда\nС - Редко",
                                   reply_markup=kb.response_options)
     await state.set_state(SkinTypeTest.question_2)
 
@@ -96,7 +96,7 @@ async def handle_question_1(callback: CallbackQuery, state: FSMContext):
 async def handle_question_2(callback: CallbackQuery, state: FSMContext):
     print(callback.data)
     await state.update_data(answer_2=callback.data)
-    await callback.message.answer("Вопрос 3: Ваша кожа чувствительная? (a), (b), (c)",
+    await callback.message.answer("Вопрос 3: Ваша кожа чувствительная?\n\nA - Да, очень\nB - Иногда\nC - Нет",
                                   reply_markup=kb.response_options)
     await state.set_state(SkinTypeTest.question_3)
 
