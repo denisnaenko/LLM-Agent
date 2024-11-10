@@ -26,3 +26,9 @@ settings_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Включить/выключить уведомления", callback_data="toggle_notifications")],
     [InlineKeyboardButton(text="Удалить историю анализов", callback_data="delete_history")]]
 )
+
+# Inline меню для "Персональные рекомендации" -> "Узнать свой тип кожи"
+response_options = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="a", callback_data="a"),
+    InlineKeyboardButton(text="b", callback_data="b"),
+    InlineKeyboardButton(text="c", callback_data="c")]])

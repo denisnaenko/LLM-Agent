@@ -64,7 +64,17 @@ async def handle_other_commands(message: Message, state: FSMContext):
 async def personal_rec(message: Message):
     await message.answer("Выберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
 
-# обработка опции "Персональные рекомендации" -> "Ввести данные о коже"
+# обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи"
+@router.callback_query(lambda c: c.data == "get_skin_type")
+async def get_skin_type(callback: CallbackQuery):
+    await callback.message.answer("Пройдите тест, чтобы определить ваш тип кожи:")
+    """
+    # функционал теста
+    ....
+
+    await.callback.message.answer("Ваш тип кожи: ", test_result)
+    """
+
 
 # обработка опции "Персональные рекомендации" -> "Получить рекомендации"
 @router.callback_query(lambda c: c.data == "get_recommendations")
