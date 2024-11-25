@@ -19,3 +19,8 @@ python-dotenv==1.0.1
 SQLAlchemy==2.0.36
 typing_extensions==4.12.2
 yarl==1.17.1
+sentence-transformers==3.3.0
+torch==2.5.1
+transformers==4.46.2
+langchain-core==0.3.19
+anggraph==0.2.50
