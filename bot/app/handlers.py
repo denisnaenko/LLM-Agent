@@ -1,5 +1,6 @@
 import app.keyboards as kb
 import app.database.requests as rq
+import os
 
 from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
@@ -8,6 +9,9 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 from .skin_test import determine_skin_type
 
+# text recognition
+from PIL import Image
+from pytesseract import pytesseract
 
 
 router = Router()
@@ -24,6 +28,14 @@ class SkinTypeTest(StatesGroup):
     
     calculating_result = State()
 
+# функция для распознавания текста с изображения
+async def recognize_text_from_image(image_path: str) -> str:
+    try:
+        img = Image.open(image_path)
+        text = pytesseract.image_to_string(img)
+        return text.strip() if text.strip() else "Текст не распознан"
+    except Exception as e:
+        return f"Ошибка при распознавании текста: {e}"
 
 # обработка команды /start
 @router.message(CommandStart())
@@ -49,8 +61,31 @@ async def upload_photo(callback: CallbackQuery, state: FSMContext):
 # обработка загруженного фото в состоянии 'waiting_for_photo'
 @router.message(UploadPhotoState.waiting_for_photo, F.photo)
 async def handle_photo(message: Message, state: FSMContext):
-    await message.answer("Функционал анализа фото ещё не реализован")
+    
+    # скачиваем изображение
+    photo = message.photo[-1]   # берём изображение максимального разрешения
+
+    file = await message.bot.get_file(photo.file_id)
+    file_path = file.file_path
+
+    destination = f"downloads/{photo.file_id}.jpg"
+    os.makedirs("downloads", exist_ok=True)
+
+    # загружаем фото
+    await message.bot.download_file(file_path, destination)
+    await message.answer("Фото успешно загружено. Теперь я могу приступить к анализу...")
+
+    # распознаём текст с изображения
+    recognized_text = await recognize_text_from_image(destination)
+
+    # отправляем пользователю результат
+    await message.answer(f"Распознанный текст с изображения:\n\n{recognized_text}")
+
+    # удаляем временный файл
+    os.remove(destination)
+
     await state.clear()
+    
 
 # обработка опции "Начать анализ" -> "Использовать текстовый ввод"
 @router.callback_query(lambda c: c.data == "text_input")
