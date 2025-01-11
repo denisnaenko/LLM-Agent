@@ -1,13 +1,19 @@
-def determine_skin_type(answers):
-    answer_1 = answers.get("answer_1")
-    answer_2 = answers.get("answer_2")
-    answer_3 = answers.get("answer_3")
+from collections import Counter
 
-    if answer_1 == "a" and answer_2 == "a" and answer_3 == "b":
-        return "Жирная кожа"
-    elif answer_1 == "c" and answer_3 == "a":
-        return "Сухая и чувствительная кожа"
-    elif answer_2 == "b" and answer_3 == "b":
-        return "Комбинированная кожа"
-    else:
-        return "Нормальная кожа"
+def determine_skin_type(answers):
+    all_answers = []
+    for i in range(1, 7):
+        cur_answer = answers.get(f"answer_{i}")
+        all_answers.append(cur_answer)
+    
+    ctr = Counter(all_answers)
+    most_common_answer = ctr.most_common(1)[0][0]
+
+    if most_common_answer == "a":
+        return "Нормальная"
+    elif most_common_answer == "b":
+        return "Cухая"
+    elif most_common_answer == "c":
+        return "Жирная"
+    elif most_common_answer == "d":
+        return "Комбинированная"
