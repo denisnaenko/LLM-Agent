@@ -27,9 +27,21 @@ settings_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Удалить историю анализов", callback_data="delete_history")]]
 )
 
-# Inline меню для "Персональные рекомендации" -> "Узнать свой тип кожи"
-response_options = InlineKeyboardMarkup(inline_keyboard=[
+# Inline меню из 4 кнопок для "Персональные рекомендации" -> "Узнать свой тип кожи"
+response_4_options = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="A", callback_data="a"),
     InlineKeyboardButton(text="B", callback_data="b"),
     InlineKeyboardButton(text="C", callback_data="c"),
     InlineKeyboardButton(text="D", callback_data="d")]])
+
+# Inline меню из 3 кнопок для "Персональные рекомендации" -> "Узнать свой тип кожи"
+response_3_options = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="A", callback_data="a"),
+    InlineKeyboardButton(text="B", callback_data="b"),
+    InlineKeyboardButton(text="C", callback_data="c")]])
+
+# Inline меню из 2 кнопок для "Персональные рекомендации" -> "Узнать свой тип кожи"
+response_2_options = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="A", callback_data="a"),
+    InlineKeyboardButton(text="B", callback_data="b")]])
+
