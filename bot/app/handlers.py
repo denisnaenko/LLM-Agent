@@ -45,7 +45,6 @@ async def recognize_text_from_image(image_path: str) -> str:
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    await rq.set_user(message.from_user.id)
     await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
                          reply_markup=kb.main_menu)
 
