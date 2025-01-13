@@ -257,7 +257,7 @@ async def handle_question_3(callback: CallbackQuery, state: FSMContext):
 # обработка опции "Персональные рекомендации" -> "Получить рекомендации"
 @router.callback_query(lambda c: c.data == "get_recommendations")
 async def get_recommendations(callback: CallbackQuery):
-    await callback.message.answer("Вот персональные рекомендации для ухода за вашим типом кожи:")
+    await callback.message.answer("Вот персональные рекомендации для ухода за вашим типом кожи, учитывая все её особенности:")
     """
     (место для реализации функционала)
     ...
