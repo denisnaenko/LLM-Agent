@@ -100,8 +100,8 @@ def crop_object(image_path, model_path, class_to_crop, output_dir="cropped_image
 
 
 if __name__ == "__main__":
-   image_path = r"C:\Games\20241113_125742.jpg"  # путь к изображению
-   model_path = r"trained_model.pt"  # путь к обученной модели YOLO
+   image_path = r"20241113_125742.jpg"  # путь к изображению
+   model_path = r"../../../models/trained_model.pt"  # путь к обученной модели YOLO
    class_to_crop = "makeup-composition"  # название класса, который нужно обрезать
    output_directory = "cropped_images"  # Директория для сохранения обрезанных изображений
    use_contour_cropping = False
