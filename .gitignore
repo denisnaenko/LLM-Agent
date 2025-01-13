@@ -3,3 +3,6 @@
 .env
 **/__pycache__/
 *.sqlite3
+*.db
+models/
+/python3.9_venv
