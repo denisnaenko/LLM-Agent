@@ -8,11 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 from .skin_test import determine_skin_type
-
-# text recognition
-from PIL import Image
-from pytesseract import pytesseract
-
+from .services.cropper import crop_object_async
 
 router = Router()
 
@@ -36,15 +32,6 @@ class SkinTypeTest(StatesGroup):
     question_12 = State()
     question_13 = State()
     calculating_result = State()
-
-# функция для распознавания текста с изображения
-async def recognize_text_from_image(image_path: str) -> str:
-    try:
-        img = Image.open(image_path)
-        text = pytesseract.image_to_string(img)
-        return text.strip() if text.strip() else "Текст не распознан"
-    except Exception as e:
-        return f"Ошибка при распознавании текста: {e}"
 
 # обработка команды /start
 @router.message(CommandStart())
@@ -70,7 +57,7 @@ async def upload_photo(callback: CallbackQuery, state: FSMContext):
 @router.message(UploadPhotoState.waiting_for_photo, F.photo)
 async def handle_photo(message: Message, state: FSMContext):
     
-    # скачиваем изображение
+    # Скачиваем изображение
     photo = message.photo[-1]   # берём изображение максимального разрешения
 
     file = await message.bot.get_file(photo.file_id)
@@ -79,15 +66,14 @@ async def handle_photo(message: Message, state: FSMContext):
     destination = f"downloads/{photo.file_id}.jpg"
     os.makedirs("downloads", exist_ok=True)
 
-    # загружаем фото
+    # Загружаем фото
     await message.bot.download_file(file_path, destination)
-    await message.answer("Фото успешно загружено. Теперь я могу приступить к анализу...")
 
-    # распознаём текст с изображения
-    recognized_text = await recognize_text_from_image(destination)
+    # Обрезаем изображение
+    cropper_res = await crop_object_async(destination)
 
-    # отправляем пользователю результат
-    await message.answer(f"Распознанный текст с изображения:\n\n{recognized_text}")
+    # Отправляем полученный исход обрезки изображения
+    await message.answer(cropper_res)
 
     # удаляем временный файл
     os.remove(destination)
