@@ -226,7 +226,7 @@ async def handle_question_3(callback: CallbackQuery, state: FSMContext):
                                   
     # получение данных из состояния
     user_data = await state.get_data()
-    skin_type, features, risks = determine_skin_type(user_data)
+    skin_type, features, risks = await determine_skin_type(user_data)
 
     # сохранение результата в бд
     await rq.upsert_user(tg_id=callback.from_user.id, 
