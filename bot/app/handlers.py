@@ -7,17 +7,22 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
-from .skin_test import determine_skin_type
+from .helpers.skin_test import determine_skin_type
 from .services.cropper import crop_object_async
 from .services.find_func import analyze_ingredients
+from .helpers.ingredient_invalidation import is_valid_ingredients_text
 
 router = Router()
 
-# создание состояние для загрузки фото
+# Состояние ожидания загрузки фото для анализа
 class UploadPhotoState(StatesGroup):
     waiting_for_photo = State()
 
-# создание состояния для теста на тип кожи
+# Состояние ожидания ввода текста пользователем для анализа
+class TextInputState(StatesGroup):
+    waiting_for_text = State()
+
+# Состояния для вопросов теста на тип кожи
 class SkinTypeTest(StatesGroup):
     question_1 = State()
     question_2 = State()
@@ -34,27 +39,27 @@ class SkinTypeTest(StatesGroup):
     question_13 = State()
     calculating_result = State()
 
-# обработка команды /start
+# Обработка команды /start
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
                          reply_markup=kb.main_menu)
 
-# обработка опции "Начать анализ"
+# Обработка опции "Начать анализ"
 @router.message(lambda message: message.text == "Начать анализ")
 async def start_analysis(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("Выберите действие для анализа состава:", reply_markup=kb.analysis_menu)
 
-# обработка опции "Начать анализ" -> "Загрузить фото состава"
+# Обработка опции "Начать анализ" -> "Загрузить фото состава"
 @router.callback_query(lambda c: c.data == "upload_photo")
 async def upload_photo(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Загрузите фото состава для анализа")
     await state.set_state(UploadPhotoState.waiting_for_photo)
     await callback.answer()
 
-# обработка загруженного фото в состоянии 'waiting_for_photo'
+# [SUB] Обработка загруженного фото в состоянии 'waiting_for_photo'
 @router.message(UploadPhotoState.waiting_for_photo, F.photo)
 async def handle_photo(message: Message, state: FSMContext):
     
@@ -69,51 +74,63 @@ async def handle_photo(message: Message, state: FSMContext):
 
     # Загружаем фото
     await message.bot.download_file(file_path, destination)
-
     # Обрезаем фото
     crooper_res, cropper_msg = await crop_object_async(destination)
 
     # Отправляем полученный исход обрезки фото
     await message.answer(cropper_msg)
-
+    
     # Анализируем ингредиенты с фото
     if crooper_res:
         product_conclusion = await analyze_ingredients()
 
     await message.answer(product_conclusion)
 
-    # удаляем временный файл
-    os.remove(destination)
-
+    os.remove(destination)  # удаляем временный файл
     await state.clear()
     
-
-# обработка опции "Начать анализ" -> "Использовать текстовый ввод"
+# Обработка опции "Начать анализ" -> "Использовать текстовый ввод"
 @router.callback_query(lambda c: c.data == "text_input")
-async def text_input(callback: CallbackQuery, state: FSMContext):
+async def text_input(callback: CallbackQuery, state: FSMContext):    
     await state.clear()
-    await callback.message.answer("Введите текст состава для анализа")
-    await callback.answer()
+    await state.set_state(TextInputState.waiting_for_text)
     
-# обработка перехода на другие опции с 'Начать анализ' и сброс состояния
-@router.message(F.text)
-async def handle_other_commands(message: Message, state: FSMContext):
-    await state.clear()
-    if message.text == "Персональные рекомендации":
-        await personal_rec(message)
-    elif message.text == "История анализов":
-        await analysis_history(message)
-    elif message.text == "Настройки":
-        await settings(message)
+    await callback.message.answer("Введите состав вашего средства для анализа:")
+    await callback.answer()
 
-# обработка опции "Персональные рекомендации"
+# [SUB] Получение введённого текста и анализ
+@router.message(TextInputState.waiting_for_text)
+async def handle_text_input(message: Message, state: FSMContext):
+    
+    user_text = message.text
+    if await handle_other_commands(message, state): return
+
+    # Проверка корректности введённого состава
+    is_valid, validation_message = await is_valid_ingredients_text(user_text)
+
+    if not is_valid:
+        # Отправка сообщения о проблеме
+        await message.answer(f"{validation_message}\n\n"
+                             f"🔁 Убедитесь, что вы указали все ингредиенты, как они указаны в составе, и попробуйте ещё раз:")
+        
+        await state.clear()
+        await state.set_state(TextInputState.waiting_for_text)
+        return
+    
+    # Передача текста в функцию анализа
+    result = await analyze_ingredients(user_text)
+
+    # Отправка результата пользователю
+    await message.answer(result)
+    await state.clear()
+
+# Обработка опции "Персональные рекомендации"
 @router.message(lambda message: message.text == "Персональные рекомендации")
 async def personal_rec(message: Message):
     await message.answer("Выберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
 
-# обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи"
-
-# Вопрос 1:
+# Обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи"
+# [SUB] Вопрос 1:
 @router.callback_query(lambda c: c.data == "get_skin_type")
 async def get_skin_type(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer("Пройдите тест, чтобы определить ваш тип кожи и её особенности:")
@@ -121,7 +138,7 @@ async def get_skin_type(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_1)    
 
-# Вопрос 2:
+# [SUB] Вопрос 2:
 @router.callback_query(SkinTypeTest.question_1)
 async def handle_question_1(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_1=callback.data)
@@ -129,7 +146,7 @@ async def handle_question_1(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_2)
 
-# Вопрос 3:
+# [SUB] Вопрос 3:
 @router.callback_query(SkinTypeTest.question_2)
 async def handle_question_2(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_2=callback.data)
@@ -137,7 +154,7 @@ async def handle_question_2(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_3)
 
-# Вопрос 4:
+# [SUB] Вопрос 4:
 @router.callback_query(SkinTypeTest.question_3)
 async def handle_question_3(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_3=callback.data)
@@ -145,7 +162,7 @@ async def handle_question_3(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_4)
 
-# Вопрос 5:
+# [SUB] Вопрос 5:
 @router.callback_query(SkinTypeTest.question_4)
 async def handle_question_4(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_4=callback.data)
@@ -153,7 +170,7 @@ async def handle_question_4(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_5)
 
-# Вопрос 6:
+# [SUB] Вопрос 6:
 @router.callback_query(SkinTypeTest.question_5)
 async def handle_question_5(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_5=callback.data)
@@ -161,7 +178,7 @@ async def handle_question_5(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_6)
 
-# Вопрос 7:
+# [SUB] Вопрос 7:
 @router.callback_query(SkinTypeTest.question_6)
 async def handle_question_6(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_6=callback.data)
@@ -169,7 +186,7 @@ async def handle_question_6(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_7)
 
-# Вопрос 8:
+# [SUB] Вопрос 8:
 @router.callback_query(SkinTypeTest.question_7)
 async def handle_question_7(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_7=callback.data)
@@ -177,7 +194,7 @@ async def handle_question_7(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_8)
 
-# Вопрос 9:
+# [SUB] Вопрос 9:
 @router.callback_query(SkinTypeTest.question_8)
 async def handle_question_8(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_8=callback.data)
@@ -185,7 +202,7 @@ async def handle_question_8(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_2_options)
     await state.set_state(SkinTypeTest.question_9)
 
-# Вопрос 10:
+# [SUB] Вопрос 10:
 @router.callback_query(SkinTypeTest.question_9)
 async def handle_question_9(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_9=callback.data)
@@ -193,7 +210,7 @@ async def handle_question_9(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_4_options)
     await state.set_state(SkinTypeTest.question_10)
 
-# Вопрос 11:
+# [SUB] Вопрос 11:
 @router.callback_query(SkinTypeTest.question_10)
 async def handle_question_10(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_10=callback.data)
@@ -201,7 +218,7 @@ async def handle_question_10(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_2_options)
     await state.set_state(SkinTypeTest.question_11)
 
-# Вопрос 12:
+# [SUB] Вопрос 12:
 @router.callback_query(SkinTypeTest.question_11)
 async def handle_question_11(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_11=callback.data)
@@ -209,7 +226,7 @@ async def handle_question_11(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_2_options)
     await state.set_state(SkinTypeTest.question_12)
 
-# Вопрос 13:
+# [SUB] Вопрос 13:
 @router.callback_query(SkinTypeTest.question_12)
 async def handle_question_12(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_12=callback.data)
@@ -217,24 +234,23 @@ async def handle_question_12(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_3_options)
     await state.set_state(SkinTypeTest.question_13)
 
-# Вывод результата теста:
+# [SUB] Вывод результата теста:
 @router.callback_query(SkinTypeTest.question_13)
 async def handle_question_3(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_13=callback.data)
     await callback.message.answer("Спасибо за ответы! Пожалуйста, подождите, пока я анализирую ваш тип кожи...")
     await state.set_state(SkinTypeTest.calculating_result)
                                   
-    # получение данных из состояния
+    # Получение данных из состояния
     user_data = await state.get_data()
     skin_type, features, risks = await determine_skin_type(user_data)
 
-    # сохранение результата в бд
+    # Сохранение результата в бд
     await rq.upsert_user(tg_id=callback.from_user.id, 
                          skin_type=skin_type,
                          features=features,
                          risks=risks
                          )
-
     # Завершение теста
     response_text = (
         f"Тип вашей кожи: {skin_type}\n\n"
@@ -247,7 +263,7 @@ async def handle_question_3(callback: CallbackQuery, state: FSMContext):
 
     await state.clear()
 
-# обработка опции "Персональные рекомендации" -> "Получить рекомендации"
+# Обработка опции "Персональные рекомендации" -> "Получить рекомендации"
 @router.callback_query(lambda c: c.data == "get_recommendations")
 async def get_recommendations(callback: CallbackQuery):
     await callback.message.answer("Вот персональные рекомендации для ухода за вашим типом кожи, учитывая все её особенности:")
@@ -257,23 +273,33 @@ async def get_recommendations(callback: CallbackQuery):
     """
     await callback.answer()
 
-# обработка опции "История анализов"
+# Обработка опции "История анализов"
 @router.message(lambda message: message.text == "История анализов")
 async def analysis_history(message: Message):
     await message.answer("Здесь будет ваша история анализов (функционал пока не реализован)")
 
-# обработка опции "Настройки"
+# Обработка опции "Настройки"
 @router.message(lambda message: message.text == "Настройки")
 async def settings(message: Message):
     await message.answer("Настройки:", reply_markup=kb.settings_menu)
 
-# обработка опции "Настройки" -> "Обновить информацию о коже"
 
-# обработка опции "Настройки" -> "Включить/выключить уведомления"
+# [HELP] Обработка перехода между опциями
+@router.message(F.text)
+async def handle_other_commands(message: Message, state: FSMContext):
+    await state.clear()
+    if message.text == "Персональные рекомендации":
+        await personal_rec(message)
+    elif message.text == "История анализов":
+        await analysis_history(message)
+    elif message.text == "Настройки":
+        await settings(message)
+    else: 
+        return False
+    
+    return True
 
-# обработка опции "Настройки" -> "Удалить историю анализов"
-
-# обработка команды /help
+# Обработка команды /help
 @router.message(Command('help')) 
 async def get_help(message: Message):
     await message.answer("Это команда /help")
