@@ -9,6 +9,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 from .skin_test import determine_skin_type
 from .services.cropper import crop_object_async
+from .services.find_func import analyze_ingredients
 
 router = Router()
 
@@ -69,11 +70,17 @@ async def handle_photo(message: Message, state: FSMContext):
     # Загружаем фото
     await message.bot.download_file(file_path, destination)
 
-    # Обрезаем изображение
-    cropper_res = await crop_object_async(destination)
+    # Обрезаем фото
+    crooper_res, cropper_msg = await crop_object_async(destination)
 
-    # Отправляем полученный исход обрезки изображения
-    await message.answer(cropper_res)
+    # Отправляем полученный исход обрезки фото
+    await message.answer(cropper_msg)
+
+    # Анализируем ингредиенты с фото
+    if crooper_res:
+        product_conclusion = await analyze_ingredients()
+
+    await message.answer(product_conclusion)
 
     # удаляем временный файл
     os.remove(destination)
