@@ -80,13 +80,15 @@ async def process_ingredients(ingredients_list, db_name):
     return found_count, dangerous_count, not_recommended_count
 
 
-async def analyze_ingredients():
+async def analyze_ingredients(text=None):
     """
     Получает список ингредиентов, анализирует их опасность и выводит результаты.
     """
 
-    ocr_result = await ocr_func()
-    ingredients_list = await get_ingredients_list(ocr_result)
+    if not text:
+        text = await ocr_func()
+    
+    ingredients_list = await get_ingredients_list(text)
     found_ingredients_count = await process_ingredients(ingredients_list, db_name="ingredients.db")
 
     if found_ingredients_count[1] > 1:
