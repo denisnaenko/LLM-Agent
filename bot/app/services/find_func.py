@@ -1,21 +1,20 @@
-import sqlite3
+import aiosqlite
 import re
 
-from ocr_processor import ocr_func
+from .ocr_processor import ocr_func
 
-def get_ingredients_list(text):
+async def get_ingredients_list(text):
     """
     Разделяет текст на ингредиенты, удаляет скобки и их содержимое,
-    заменяет ';' и ':' на ',', а затем разделяя по запятой.
+    заменяет ';' и ':' на ',', а затем разделяет по запятой.
     """
-    if text is None:
-        return []
-    print(text)
+    if text is None: return []
+
     # Удаляем все, что находится в круглых скобках, включая скобки
     text = re.sub(r'\([^)]*\)', '', text)
 
     # Заменяем ';' и ':' на ',', чтобы упростить разбиение
-    text = text.replace(';', ',').replace(':', ',').replace('  ',' ')
+    text = text.replace(';', ',').replace(':', ',').replace('  ', ' ')
 
     # Разделяем текст по запятой, получаем список ингредиентов и убираем лишние пробелы
     ingredients = [ingredient.strip() for ingredient in text.split(',')]
@@ -23,57 +22,52 @@ def get_ingredients_list(text):
     return ingredients
 
 
-
-def get_ingredient_info_by_name(ingredient_name, db_name):
+async def get_ingredient_info_by_name(ingredient_name, db_name):
     """
     Ищет ингредиент в базе данных по имени (точное и примерное совпадение).
     """
-    conn = sqlite3.connect(db_name)
-    cursor = conn.cursor()
+    async with aiosqlite.connect(db_name) as conn:
+        cursor = await conn.cursor()
 
-    # точное совпадение
-    cursor.execute("""
-    SELECT i.name, i.description, i.sources, i.effect, 
-           i.role, i.danger, i.not_for_skin_type, i.for_skin_type
-    FROM ingredients i
-    WHERE i.name ==
-        (SELECT name FROM synonyms WHERE synonym = ?)
-    GROUP BY i.name
-    """, (ingredient_name,))
+        # точное совпадение
+        await cursor.execute("""
+        SELECT i.name, i.description, i.sources, i.effect, 
+               i.role, i.danger, i.not_for_skin_type, i.for_skin_type
+        FROM ingredients i
+        WHERE i.name ==
+            (SELECT name FROM synonyms WHERE synonym = ?)
+        GROUP BY i.name
+        """, (ingredient_name,))
+        result = await cursor.fetchone()
+        if result:
+            return result
 
-    result = cursor.fetchone()
-    if result:
-        conn.close()
+        # примерное совпадение, если точного нет
+        await cursor.execute("""
+        SELECT i.name, i.description, i.sources, i.effect, 
+               i.role, i.danger, i.not_for_skin_type, i.for_skin_type
+        FROM ingredients i
+        WHERE i.name ==
+            (SELECT name FROM synonyms WHERE synonym LIKE ?)
+        GROUP BY i.name
+        """, ('%' + ingredient_name + '%',))
+        result = await cursor.fetchone()
         return result
 
-    # примерное совпадение, если точного нет
-    cursor.execute("""
-    SELECT i.name, i.description, i.sources, i.effect, 
-           i.role, i.danger, i.not_for_skin_type, i.for_skin_type
-    FROM ingredients i
-    WHERE i.name ==
-        (SELECT name FROM synonyms WHERE synonym LIKE ?)
-    GROUP BY i.name
-    """, ('%' + ingredient_name + '%',))
 
-    result = cursor.fetchone()
-    conn.close()
-    return result
-
-
-def process_ingredients(ingredients_list, db_name):
+async def process_ingredients(ingredients_list, db_name):
     """
     Ищет каждый ингредиент из списка в базе данных и подсчитывает найденные.
     """
     found_count = 0
     dangerous_count = 0
-    not_recommended_count= 0
+    not_recommended_count = 0
+    
+    print("[LOG] Начало проверки ингредиентов")
     for ingredient in ingredients_list:
         ingredient = ingredient.lower().strip()  # приводим к нижнему регистру и убираем пробелы
-        print(f"Проверка ингредиента: {ingredient}")
-        ingredient_info = get_ingredient_info_by_name(ingredient, db_name)
+        ingredient_info = await get_ingredient_info_by_name(ingredient, db_name)
         if ingredient_info:
-            print(f"  -> Найден: {ingredient_info[0]}")
             found_count += 1
             if ingredient_info[5] == '':
                 continue
@@ -82,30 +76,28 @@ def process_ingredients(ingredients_list, db_name):
                     dangerous_count += 1
                 else:
                     not_recommended_count += 1
-        else:
-            print(f"  -> Ингредиент не найден: {ingredient}")
+
     return found_count, dangerous_count, not_recommended_count
 
 
-def analyze_ingredients(db_name):
+async def analyze_ingredients():
     """
     Получает список ингредиентов, анализирует их опасность и выводит результаты.
     """
-    ingredients_list = get_ingredients_list(ocr_func())
-    found_ingredients_count = process_ingredients(ingredients_list, db_name)
 
-    print(f'''\nНайдено ингредиентов: {found_ingredients_count[0]} из {len(ingredients_list)}
-Опасных: {found_ingredients_count[1]}\nНерекомендуемых: {found_ingredients_count[2]}''')
+    ocr_result = await ocr_func()
+    ingredients_list = await get_ingredients_list(ocr_result)
+    found_ingredients_count = await process_ingredients(ingredients_list, db_name="ingredients.db")
 
     if found_ingredients_count[1] > 1:
-        print("Средство опасно!")
+        conclusion = "Ваше средство опасно для кожи!"
     elif found_ingredients_count[2] > 1:
-        print("Средство может иметь индивидуальные противопоказания!")
+        conclusion = "Ваше средство может иметь индивидуальные противопоказания!"
     else:
-        print("Средство безопасно!")
+        conclusion = "Ваше средство безопасно!"
 
-
-if __name__ == '__main__':
-    db_name = 'db212.db'
-    analyze_ingredients(db_name)
-
+    return (
+        f"Найдено {found_ingredients_count[1]} опасных для кожи ингредиентов!\n"
+        f"Также найдено {found_ingredients_count[2]} нерекомендуемых ингредиентов.\n\n"
+        f"{conclusion}"
+    )
