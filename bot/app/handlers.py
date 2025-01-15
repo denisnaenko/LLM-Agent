@@ -6,13 +6,14 @@ from aiogram import Router, F
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.types import Message, CallbackQuery
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from .helpers.skin_test import determine_skin_type
 from .services.cropper import crop_object_async
 from .services.find_func import analyze_ingredients
 from .services.personal_rec_request import get_result_message
 from .helpers.get_user_skin_data import get_user_data
 from .helpers.ingredient_invalidation import is_valid_ingredients_text
+from .helpers.create_pdf import create_pdf
 
 router = Router()
 
@@ -83,12 +84,15 @@ async def handle_photo(message: Message, state: FSMContext):
     await message.answer(cropper_msg)
     
     # Анализируем ингредиенты с фото
-    if crooper_res:
-        product_conclusion = await analyze_ingredients()
+    if crooper_res:  
+        result, total_msg = await analyze_ingredients()
 
-        max_length = 4096
-        for i in range(0, len(product_conclusion), max_length):
-            await message.answer(product_conclusion[i:i + max_length])
+        document_path = "pdf/Ингредиенты.pdf"
+        await create_pdf(total_msg, document_path)
+    
+        pdf_file = FSInputFile(document_path)
+        await message.answer(result)
+        await message.answer_document(pdf_file)
 
     os.remove(destination)  # удаляем временный файл
     await state.clear()
@@ -122,12 +126,15 @@ async def handle_text_input(message: Message, state: FSMContext):
         return
     
     # Передача текста в функцию анализа
-    result = await analyze_ingredients(user_text)
+    result, total_msg = await analyze_ingredients(user_text)
 
-    # Отправка результата пользователю
-    max_length = 4096
-    for i in range(0, len(result), max_length):
-        await message.answer(result[i:i + max_length])
+    document_path = "pdf/Ингредиенты.pdf"
+    await create_pdf(total_msg, document_path)
+    
+    # Отправка результата
+    pdf_file = FSInputFile(document_path)
+    await message.answer(result)
+    await message.answer_document(pdf_file)
 
     await state.clear()
 
@@ -292,7 +299,7 @@ async def get_recommendations(callback: CallbackQuery):
         # Запрос к модели
         print("[LOG] Запрос к модели")
         await callback.message.answer("Учёл все особенности вашей кожи!\n\nУже готовлю для вас рекомендации! Это займёт не более 20 секунд:)")
-        recommendations = get_result_message(skin_type, features, risks)
+        recommendations = await get_result_message(skin_type, features, risks)
 
         # Форматирование ответа
         if recommendations == "error3":
