@@ -5,7 +5,7 @@
 Version: gpt-4o-mini
 
 '''
-from openai import OpenAI
+import aiohttp
 
 # Промт для гпт-чата
 INSTRUCTION = '''
@@ -65,11 +65,11 @@ INSTRUCTION = '''
 GPT_version = "gpt-4o-mini"
 TOKENS_LIMIT = 4096
 
-def exception_handler(exception_code, api_key='', ex=''):
+async def exception_handler(exception_code, api_key='', ex=''):
     with open("error_log.txt", "a") as log_file:
         log_file.write(f"Code: {exception_code}, API Key: {api_key}, Exception: {ex}\n")
 
-def create_message(skin_type, features, risks):
+async def create_message(skin_type, features, risks):
     """
     Формирует сообщение для модели на основе данных пользователя.
     """
@@ -87,26 +87,39 @@ def create_message(skin_type, features, risks):
         {"role": "user", "content": INSTRUCTION + "\n" + user_context}
     ]
 
-def get_result_message(skin_type, features, risks):
-    message = create_message(skin_type, features, risks)
+async def get_result_message(skin_type, features, risks):
+    message = await create_message(skin_type, features, risks)
     chat_response = ""
 
     for _ in range(1, 4):  # Ограничиваем количество попыток
-
         try:
-            client = OpenAI(api_key="g4a-ewhuBdIZH5grJIcE4gA9UusWSFELslIqJTL", base_url="https://api.gpt4-all.xyz/v1")
-            response = client.chat.completions.create(
-                model=GPT_version,
-                messages=message,
-                stream=False,
-            )
-
-            chat_response = response.choices[0].message.content
-            break
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url="https://api.gpt4-all.xyz/v1/chat/completions",
+                    json={
+                        "model": GPT_version,
+                        "messages": message,
+                        "stream": False,
+                    },
+                    headers={
+                        "Authorization": f"Bearer g4a-ewhuBdIZH5grJIcE4gA9UusWSFELslIqJTL",
+                        "Content-Type": "application/json",
+                    }
+                ) as response:
+                    if response.status == 200:
+                        response_json = await response.json()
+                        chat_response = response_json['choices'][0]['message']['content']
+                        break
+                    else:
+                        await exception_handler(
+                            exception_code="error3",
+                            ex=f"HTTP {response.status}: {await response.text()}"
+                        )
+                        return "error3"
 
         except Exception as ex:
-            exception_handler(exception_code="error3", ex=ex)
+            await exception_handler(exception_code="error3", ex=ex)
             return "error3"
 
-    chat_response = chat_response.replace("*","").replace("#","")
+    chat_response = chat_response.replace("*", "").replace("#", "")
     return chat_response
