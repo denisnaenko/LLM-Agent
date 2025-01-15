@@ -6,3 +6,4 @@
 *.db
 models/
 /python3.9_venv
+/downloads
