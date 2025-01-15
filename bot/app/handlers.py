@@ -85,8 +85,10 @@ async def handle_photo(message: Message, state: FSMContext):
     # Анализируем ингредиенты с фото
     if crooper_res:
         product_conclusion = await analyze_ingredients()
-        
-        await message.answer(product_conclusion)
+
+        max_length = 4096
+        for i in range(0, len(product_conclusion), max_length):
+            await message.answer(product_conclusion[i:i + max_length])
 
     os.remove(destination)  # удаляем временный файл
     await state.clear()
@@ -123,7 +125,10 @@ async def handle_text_input(message: Message, state: FSMContext):
     result = await analyze_ingredients(user_text)
 
     # Отправка результата пользователю
-    await message.answer(result)
+    max_length = 4096
+    for i in range(0, len(result), max_length):
+        await message.answer(result[i:i + max_length])
+
     await state.clear()
 
 # Обработка опции "Персональные рекомендации"
@@ -286,6 +291,7 @@ async def get_recommendations(callback: CallbackQuery):
     else:
         # Запрос к модели
         print("[LOG] Запрос к модели")
+        await callback.message.answer("Учёл все особенности вашей кожи!\n\nУже готовлю для вас рекомендации! Это займёт не более 20 секунд:)")
         recommendations = get_result_message(skin_type, features, risks)
 
         # Форматирование ответа
