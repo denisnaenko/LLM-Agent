@@ -47,4 +47,6 @@ response_2_options = InlineKeyboardMarkup(inline_keyboard=[
 
 # Inline меню для отправки теста на тип кожи
 response_skin_test = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Самостоятельно определить тип кожи", callback_data="show_skin_test")]])
+    [InlineKeyboardButton(text="Самостоятельно определить тип кожи", callback_data="show_skin_test")],
+    [InlineKeyboardButton(text="Получить рекомендации", callback_data="get_recommendations")]
+])
