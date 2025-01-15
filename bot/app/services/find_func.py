@@ -1,5 +1,6 @@
 import aiosqlite
 from .ocr_processor import ocr_func
+from .organize_text import get_organized_text
 
 async def get_ingredients_str(text):
     """
@@ -374,9 +375,11 @@ async def analyze_ingredients(text=None):
     else:
         conclusion = "Ваше средство безопасно!"
 
+    total_msg = await get_organized_text(total_msg)
+    
     return (
-        f"Найдено {len(dangerous)} опасных для кожи ингредиентов!\n"
-        f"Также найдено {len(not_recommended)} нерекомендуемых ингредиентов.\n\n"
-        f"{total_msg}"
-        f"{conclusion}"
-    )
+        f"Найдено опасных для кожи ингредиентов: {len(dangerous)}!\n"
+        f"Ингредиенты которые стоит использовать с осторожностью: {len(not_recommended)}!\n\n"
+        f"{conclusion}\n\n"
+        f"Ознакомиться с характеристиками ингредиентов можно в файле ниже:"
+    ), total_msg
