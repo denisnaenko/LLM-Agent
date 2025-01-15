@@ -63,7 +63,6 @@ async def process_ingredients(ingredients_list, db_name):
     dangerous_count = 0
     not_recommended_count = 0
     
-    print("[LOG] Начало проверки ингредиентов")
     for ingredient in ingredients_list:
         ingredient = ingredient.lower().strip()  # приводим к нижнему регистру и убираем пробелы
         ingredient_info = await get_ingredient_info_by_name(ingredient, db_name)
