@@ -3,9 +3,7 @@ from aiogram.types import (ReplyKeyboardMarkup, KeyboardButton,
 
 # Главное меню - ReplyKeyboardMarkup
 main_menu = ReplyKeyboardMarkup(keyboard=[                        
-    [KeyboardButton(text="Начать анализ")],
-    [KeyboardButton(text="Персональные рекомендации")],
-    [KeyboardButton(text="История анализов"), KeyboardButton(text="Настройки")]
+    [KeyboardButton(text="Начать анализ"), KeyboardButton(text="Персональные рекомендации")]
 ], resize_keyboard=True)
 
 # Inline меню для опции "Начать анализ"
@@ -18,13 +16,6 @@ analysis_menu = InlineKeyboardMarkup(inline_keyboard=[
 personal_rec_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="Узнать свой тип кожи", callback_data="get_skin_type")],
     [InlineKeyboardButton(text="Получить рекомендации", callback_data="get_recommendations")]]
-)
-
-# Inline меню для опции "Настройки"
-settings_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Обновить информацию о коже", callback_data="update_skin_info")],
-    [InlineKeyboardButton(text="Включить/выключить уведомления", callback_data="toggle_notifications")],
-    [InlineKeyboardButton(text="Удалить историю анализов", callback_data="delete_history")]]
 )
 
 # Inline меню из 4 кнопок для "Персональные рекомендации" -> "Узнать свой тип кожи"
