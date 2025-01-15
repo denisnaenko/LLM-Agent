@@ -17,6 +17,7 @@ easyocr==1.7.2
 exceptiongroup==1.2.2
 filelock==3.16.1
 fonttools==4.55.3
+fpdf==1.7.2
 frozenlist==1.5.0
 fsspec==2024.12.0
 greenlet==3.1.1
