@@ -49,11 +49,13 @@ async def cmd_start(message: Message, state: FSMContext):
     await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
                          reply_markup=kb.main_menu)
 
+
 # Обработка опции "Начать анализ"
 @router.message(lambda message: message.text == "Начать анализ")
 async def start_analysis(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("Выберите действие для анализа состава:", reply_markup=kb.analysis_menu)
+
 
 # Обработка опции "Начать анализ" -> "Загрузить фото состава"
 @router.callback_query(lambda c: c.data == "upload_photo")
@@ -97,6 +99,7 @@ async def handle_photo(message: Message, state: FSMContext):
     os.remove(destination)  # удаляем временный файл
     await state.clear()
     
+
 # Обработка опции "Начать анализ" -> "Использовать текстовый ввод"
 @router.callback_query(lambda c: c.data == "text_input")
 async def text_input(callback: CallbackQuery, state: FSMContext):    
@@ -138,10 +141,12 @@ async def handle_text_input(message: Message, state: FSMContext):
 
     await state.clear()
 
+
 # Обработка опции "Персональные рекомендации"
 @router.message(lambda message: message.text == "Персональные рекомендации")
 async def personal_rec(message: Message):
     await message.answer("Выберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
+
 
 # Обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи"
 # [SUB] Вопрос 1:
@@ -250,7 +255,7 @@ async def handle_question_12(callback: CallbackQuery, state: FSMContext):
 
 # [SUB] Вывод результата теста:
 @router.callback_query(SkinTypeTest.question_13)
-async def handle_question_3(callback: CallbackQuery, state: FSMContext):
+async def handle_question_13(callback: CallbackQuery, state: FSMContext):
     await state.update_data(answer_13=callback.data)
     await state.set_state(SkinTypeTest.calculating_result)
                                   
@@ -277,6 +282,7 @@ async def handle_question_3(callback: CallbackQuery, state: FSMContext):
                                   reply_markup=kb.response_skin_test)
     
     await state.clear()
+
 
 # Обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи" -> "Самостоятельно определить тип кожи"
 @router.callback_query(lambda c: c.data == "show_skin_test")
@@ -311,16 +317,6 @@ async def get_recommendations(callback: CallbackQuery):
 
     await callback.answer()
 
-# Обработка опции "История анализов"
-@router.message(lambda message: message.text == "История анализов")
-async def analysis_history(message: Message):
-    await message.answer("Здесь будет ваша история анализов (функционал пока не реализован)")
-
-# Обработка опции "Настройки"
-@router.message(lambda message: message.text == "Настройки")
-async def settings(message: Message):
-    await message.answer("Настройки:", reply_markup=kb.settings_menu)
-
 
 # [HELP] Обработка перехода между опциями
 @router.message(F.text)
@@ -328,14 +324,11 @@ async def handle_other_commands(message: Message, state: FSMContext):
     await state.clear()
     if message.text == "Персональные рекомендации":
         await personal_rec(message)
-    elif message.text == "История анализов":
-        await analysis_history(message)
-    elif message.text == "Настройки":
-        await settings(message)
     else: 
         return False
     
     return True
+
 
 # Обработка команды /help
 @router.message(Command('help')) 
