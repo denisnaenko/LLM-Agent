@@ -10,6 +10,8 @@ from aiogram.types import Message, CallbackQuery
 from .helpers.skin_test import determine_skin_type
 from .services.cropper import crop_object_async
 from .services.find_func import analyze_ingredients
+from .services.personal_rec_request import get_result_message
+from .helpers.get_user_skin_data import get_user_data
 from .helpers.ingredient_invalidation import is_valid_ingredients_text
 
 router = Router()
@@ -83,8 +85,8 @@ async def handle_photo(message: Message, state: FSMContext):
     # Анализируем ингредиенты с фото
     if crooper_res:
         product_conclusion = await analyze_ingredients()
-
-    await message.answer(product_conclusion)
+        
+        await message.answer(product_conclusion)
 
     os.remove(destination)  # удаляем временный файл
     await state.clear()
@@ -273,11 +275,27 @@ async def show_skin_test(callback: CallbackQuery):
 # Обработка опции "Персональные рекомендации" -> "Получить рекомендации"
 @router.callback_query(lambda c: c.data == "get_recommendations")
 async def get_recommendations(callback: CallbackQuery):
-    await callback.message.answer("Вот персональные рекомендации для ухода за вашим типом кожи, учитывая все её особенности:")
-    """
-    (место для реализации функционала)
-    ...
-    """
+    tg_id = callback.from_user.id
+    skin_type, features, risks = get_user_data(tg_id)
+
+    if not skin_type:
+        # Если пользователя не в БД
+        await callback.message.answer(
+            "Пожалуйста, пройдите тест на определение типа кожи перед тем, как получать персональные рекомендации."
+        )
+    else:
+        # Запрос к модели
+        print("[LOG] Запрос к модели")
+        recommendations = get_result_message(skin_type, features, risks)
+
+        # Форматирование ответа
+        if recommendations == "error3":
+            await callback.message.answer("Произошла ошибка при получении рекомендаций. Попробуйте позже.")
+        else:
+            await callback.message.answer(
+                f"Вот персональные рекомендации средств ухода за вашим типом кожи:\n\n{recommendations}"
+            )
+
     await callback.answer()
 
 # Обработка опции "История анализов"
