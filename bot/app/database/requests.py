@@ -19,13 +19,9 @@ async def upsert_user(tg_id: int, skin_type: str, features: List[str], risks: Li
                 user_obj.skin_type = skin_type
                 user_obj.set_features(features)
                 user_obj.set_risks(risks)
-
-                print(f"Данные пользователя с tg_id={tg_id} обновлены.")
             else:
                 # Если пользователь не найден, добавляем новую запись
                 user_obj = User(tg_id=tg_id, skin_type=skin_type)
                 user_obj.set_features(features)
                 user_obj.set_risks(risks)
                 session.add(user_obj)
-                
-                print(f"Пользователь с tg_id={tg_id} добавлен в базу.")
