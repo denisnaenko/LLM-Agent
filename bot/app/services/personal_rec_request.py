@@ -101,8 +101,9 @@ async def get_result_message(skin_type, features, risks):
                         "messages": message,
                         "stream": False,
                     },
+                    
                     headers={
-                        "Authorization": f"Bearer g4a-ewhuBdIZH5grJIcE4gA9UusWSFELslIqJTL",
+                        "Authorization": f"Bearer g4a-EhTFKK7CwY19FZIr4JZvCsV1A8kJfklzjbe",
                         "Content-Type": "application/json",
                     }
                 ) as response:
