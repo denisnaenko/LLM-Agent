@@ -15,6 +15,7 @@ from .services.llama_request import query_llm
 from .helpers.get_user_skin_data import get_user_data
 from .helpers.ingredient_invalidation import is_valid_ingredients_text
 from .helpers.create_pdf import create_pdf
+import types
 
 router = Router()
 
@@ -43,10 +44,53 @@ class SkinTypeTest(StatesGroup):
     question_13 = State()
     calculating_result = State()
 
-class LLMNavigationState(StatesGroup):
-    waiting_for_instruction = State()
 
-# [SUB] Обработка инструкций в состоянии LLMNavigationState
+# Логика получения рекомендаций
+async def process_recommendations(callback_or_message, state: FSMContext, tg_id):
+    # Очистка состояния
+    await state.clear()
+
+    # Получение данных пользователя
+    skin_type, features, risks = get_user_data(tg_id)
+
+    if not skin_type:
+        # Если пользователя нет в БД
+        response = (
+            "Пожалуйста, пройдите тест на определение типа кожи перед тем, как получать персональные рекомендации."
+        )
+        if isinstance(callback_or_message, CallbackQuery):
+            await callback_or_message.message.answer(response)
+        else:
+            await callback_or_message.answer(response)
+        return
+
+    # Запрос к модели
+    loading_message = (
+        "Учёл все особенности вашей кожи!\n\n"
+        "Уже готовлю для вас рекомендации! Это займёт не более 20 секунд :)"
+    )
+    if isinstance(callback_or_message, CallbackQuery):
+        await callback_or_message.message.answer(loading_message)
+    else:
+        await callback_or_message.answer(loading_message)
+
+    # Получение рекомендаций
+    recommendations = await get_result_message(skin_type, features, risks)
+
+    if recommendations == "error3":
+        response = "Произошла ошибка при получении рекомендаций. Пожалуйста, попробуйте ещё раз!"
+    else:
+        response = (
+            f"Вот персональные рекомендации средств ухода за вашим типом кожи:\n\n{recommendations}"
+        )
+
+    # Отправка ответа
+    if isinstance(callback_or_message, CallbackQuery):
+        await callback_or_message.message.answer(response)
+    else:
+        await callback_or_message.answer(response)
+
+
 @router.message()
 async def handle_global_navigation(message: Message, state: FSMContext):
     """
@@ -61,15 +105,15 @@ async def handle_global_navigation(message: Message, state: FSMContext):
         print("photo analysis handling")
         await state.set_state(UploadPhotoState.waiting_for_photo)
         await handle_photo(message, state)
-
         return
 
     # Обработка кнопочных команд
     if await handle_other_commands(message, state): 
         print("button handling")
         return
+    
     # Обработка состава по тексту
-    elif current_state == TextInputState.waiting_for_text:
+    if current_state == TextInputState.waiting_for_text:
         print("text analysis handling")
         await handle_text_input(message, state)
         return
@@ -78,6 +122,8 @@ async def handle_global_navigation(message: Message, state: FSMContext):
     prompt = f"""
     Пользователь ввел следующий запрос: "{user_input}".  
 
+    Верни только одно слово из списка: upload_photo, text_input, get_skin_type, get_recommendations
+    
     Твоя задача: определить, какое из указанных действий наиболее подходит запросу пользователя. Выбери только одно действие из списка:  
     1. upload_photo — Анализировать состав по фото.  
     2. text_input — Анализировать состав на основе текста.  
@@ -100,10 +146,11 @@ async def handle_global_navigation(message: Message, state: FSMContext):
     Примеры запросов и действий:  
     1. Запрос: "Хочу загрузить фото для анализа." → Ответ: upload_photo  
     2. Запрос: "Проанализируй состав крема: вода, глицерин, масло." → Ответ: text_input  
-    3. Запрос: "Какой у меня тип кожи?" → Ответ: get_skin_type  
-    4. Запрос: "Посоветуй что-нибудь для сухой кожи." → Ответ: get_recommendations  
-    5. Запрос: "ааа фвафва ываывавы" → Ответ: None
-    6. Запрос: "INGREDIENTS: Glycerin, Aqua (Hungarian Thermal Water), Silt (Hungarian Mud), Copper Gluconate, Cetearyl Olivate, Lava Powder, Sorbitan Olivate" → Ответ: None
+    3. Запрос: "Анализ по тексту" → Ответ: text_input
+    4. Запрос: "Какой у меня тип кожи?" → Ответ: get_skin_type  
+    5. Запрос: "Посоветуй что-нибудь для сухой кожи." → Ответ: get_recommendations  
+    6. Запрос: "ааа фвафва ываывавы" → Ответ: None
+    7. Запрос: "INGREDIENTS: Glycerin, Aqua (Hungarian Thermal Water), Silt (Hungarian Mud), Copper Gluconate, Cetearyl Olivate, Lava Powder, Sorbitan Olivate" → Ответ: None
     """
     action = query_llm(prompt).strip()
     print("prompt handle")
@@ -124,12 +171,13 @@ async def handle_global_navigation(message: Message, state: FSMContext):
                                   reply_markup=kb.response_4_options)
         await state.set_state(SkinTypeTest.question_1)    
 
+    elif "get_recommendations" in action:
+        await process_recommendations(message, state, message.from_user.id)
+
     else:
         await message.answer(f"Не удалось распознать действие. Попробуйте ещё раз.")
         return
     
-
-
     return True
 
 
@@ -406,31 +454,7 @@ async def show_skin_test(callback: CallbackQuery):
 @router.callback_query(lambda c: c.data == "get_recommendations")
 async def get_recommendations(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
-    await state.clear()
-
-    tg_id = callback.from_user.id
-    skin_type, features, risks = get_user_data(tg_id)
-
-    if not skin_type:
-        # Если пользователя не в БД
-        await callback.message.answer(
-            "Пожалуйста, пройдите тест на определение типа кожи перед тем, как получать персональные рекомендации."
-        )
-    else:
-        # Запрос к модели
-        print("[LOG] Запрос к модели")
-        await callback.message.answer("Учёл все особенности вашей кожи!\n\nУже готовлю для вас рекомендации! Это займёт не более 20 секунд :)")
-        recommendations = await get_result_message(skin_type, features, risks)
-
-        # Форматирование ответа
-        if recommendations == "error3":
-            await callback.message.answer("Произошла ошибка при получении рекомендаций. Пожалуйста, попробуйте ещё раз!")
-        else:
-            await callback.message.answer(
-                f"Вот персональные рекомендации средств ухода за вашим типом кожи:\n\n{recommendations}"
-            )
-
-    await callback.answer()
+    await process_recommendations(callback, state, callback.from_user.id)
 
 
 # [HELP] Обработка перехода между опциями
