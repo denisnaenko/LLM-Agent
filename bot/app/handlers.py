@@ -197,6 +197,12 @@ async def cmd_start(message: Message, state: FSMContext):
                          reply_markup=kb.main_menu)
 
 
+# Обработка команды /help
+async def cmd_help(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(f"• Пользовательское соглашение:\n https://denisnaenko.github.io/LLM-Agent/user-agreement.html\n\n"
+                         f"• Обратная связь: @grinnbi")
+
 # Обработка опции "Начать анализ"
 @router.message(lambda message: message.text == "Начать анализ")
 async def start_analysis(message: Message, state: FSMContext):
@@ -467,6 +473,8 @@ async def handle_other_commands(message: Message, state: FSMContext):
         await personal_rec(message, state)
     elif message.text == "Начать анализ":
         await start_analysis(message, state)
+    elif message.text == "/help":
+        await cmd_help(message, state)
     else:
         return False
     
