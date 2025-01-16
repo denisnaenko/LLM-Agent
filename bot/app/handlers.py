@@ -46,37 +46,72 @@ class SkinTypeTest(StatesGroup):
 class LLMNavigationState(StatesGroup):
     waiting_for_instruction = State()
 
-# Обработка команды /navigate
-@router.message(Command("navigate"))
-async def navigate(message: Message, state: FSMContext):
-    """
-    Начинает работу LLM-агента для управления функциями.
-    """
-    await state.set_state(LLMNavigationState.waiting_for_instruction)
-    await message.answer("Жду ваших инструкций!")
-
 # [SUB] Обработка инструкций в состоянии LLMNavigationState
-@router.message(LLMNavigationState.waiting_for_instruction)
-async def handle_llm_instruction(message: Message, state: FSMContext):
-    state.clear()
+@router.message()
+async def handle_global_navigation(message: Message, state: FSMContext):
     """
-    Обрабатывает запросы пользователя через LLM и выполняет соответствующую функцию.
+    Глобавльный обработчки для переключения между функциями, независимо от текущего состояния.
     """
+    current_state = await state.get_state()
     user_input = message.text
+    print("global")
+
+    # Обработка загруженного фото
+    if message.photo: 
+        print("photo analysis handling")
+        await state.set_state(UploadPhotoState.waiting_for_photo)
+        await handle_photo(message, state)
+
+        return
+
+    # Обработка кнопочных команд
+    if await handle_other_commands(message, state): 
+        print("button handling")
+        return
+    # Обработка состава по тексту
+    elif current_state == TextInputState.waiting_for_text:
+        print("text analysis handling")
+        await handle_text_input(message, state)
+        return
 
     # Запрос к LLM для определения действия
     prompt = f"""
-    Пользователь сказал: "{user_input}". Выбери одно из действий:
-    1. upload_photo - Анализировать состав по фото.
-    2. text_input - Анализ текста состава.
-    3. get_skin_type - Определить тип/состояние кожи.
-    4. get_recommendations - Получить рекомендации по уходу.
-    Верни только название действия (upload_photo, text_input, get_skin_type, get_recommendations).
+    Пользователь ввел следующий запрос: "{user_input}".  
+
+    Твоя задача: определить, какое из указанных действий наиболее подходит запросу пользователя. Выбери только одно действие из списка:  
+    1. upload_photo — Анализировать состав по фото.  
+    2. text_input — Анализировать состав на основе текста.  
+    3. get_skin_type — Определить тип или состояние кожи.  
+    4. get_recommendations — Предложить рекомендации по уходу за кожей.  
+
+    Ограничения:  
+    1. Анализируй только текст на русском языке. Если текст содержит слова на других языках, возвращай "None".  
+    2. Если запрос слишком короткий (менее 3 слов) или не содержит конкретного смысла, возвращай "None". Примеры таких запросов: "аыаыаы", "что делать?", "привет".  
+    3. Если текст явно бессмысленный или случайный набор символов, букв, цифр или слов, возвращай "None".  
+    4. Если запрос содержит слова, связанные с фото или изображениями (например, "фото", "картинка", "загрузить фото"), выбери "upload_photo".  
+    5. Если запрос содержит слова, связанные с текстовым анализом состава (например, "анализ текста", "ингредиенты", "состав"), выбери "text_input".  
+    6. Если запрос содержит слова, связанные с кожей (например, "тип кожи", "состояние кожи", "тест"), выбери "get_skin_type".  
+    7. Если пользователь просит рекомендации (например, "подскажи, что мне подойдет", "какие средства выбрать", "совет"), выбери "get_recommendations".  
+
+    Важно:  
+    - Не пытайся угадать, если запрос не подходит ни под одно действие. В таких случаях верни "None".  
+    - Твой ответ должен быть только одним из следующих: upload_photo, text_input, get_skin_type, get_recommendations или None.  
+
+    Примеры запросов и действий:  
+    1. Запрос: "Хочу загрузить фото для анализа." → Ответ: upload_photo  
+    2. Запрос: "Проанализируй состав крема: вода, глицерин, масло." → Ответ: text_input  
+    3. Запрос: "Какой у меня тип кожи?" → Ответ: get_skin_type  
+    4. Запрос: "Посоветуй что-нибудь для сухой кожи." → Ответ: get_recommendations  
+    5. Запрос: "ааа фвафва ываывавы" → Ответ: None
+    6. Запрос: "INGREDIENTS: Glycerin, Aqua (Hungarian Thermal Water), Silt (Hungarian Mud), Copper Gluconate, Cetearyl Olivate, Lava Powder, Sorbitan Olivate" → Ответ: None
     """
     action = query_llm(prompt).strip()
+    print("prompt handle")
+    print(f"action: {action}")
 
     if "upload_photo" in action:
-        await message.answer("Загрузите фото состава для анализа")
+        await state.clear()
+        await message.answer("Загрузите фото состава для анализа:")
         await state.set_state(UploadPhotoState.waiting_for_photo)
 
     elif "text_input" in action:
@@ -91,13 +126,26 @@ async def handle_llm_instruction(message: Message, state: FSMContext):
 
     else:
         await message.answer(f"Не удалось распознать действие. Попробуйте ещё раз.")
+        return
+    
+
+
+    return True
 
 
 # Обработка команды /start
 @router.message(CommandStart())
 async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
-    await message.answer(f'Привет! Я - твой персональный ассистент по уходу за кожей лица.\n\nЯ помогу тебе выбрать лучшие косметические средства, основываясь на их составе, а также подберу индивидуальные рекомендации по уходу за кожей.\n\nЧем могу помочь?',
+    await message.answer(f"👋🏻 Добро пожаловать в “Агент Косметик”!\n\n"
+                         f"Я Ваш помощник в подборе качественного и подходящего именно Вам косметического ухода! Я помогу Вам выбрать лучшие косметические средства, основываясь на их составе, а также составлю рекомендации по уходу за кожей специально для Вас.\n\n\n"
+                         f"📋 Что я могу для Вас сделать?\n\n"
+                         f"• Проанализировать состав Вашего косметического средства по фото или тексту и дать подробный отчёт об используемых в нём опасных ингредиентов .\n\n"
+                         f"• Определить ваш тип кожи и выявить её особенности при помощи тестирования.\n\n"
+                         f"• Подобрать для вас персональный уход за кожей.\n\n\n"
+                         f"👉🏻 Чтобы ознакомиться с пользовательским соглашением воспользуйтесь командой /help\n\n\n"
+                         f"Приступим! Отправьте мне сообщение с действием, которое хотите выполнить, либо воспользуйтесь навигацией по кнопкам.",
+                         
                          reply_markup=kb.main_menu)
 
 
@@ -118,7 +166,7 @@ async def upload_photo(callback: CallbackQuery, state: FSMContext):
 # [SUB] Обработка загруженного фото в состоянии 'waiting_for_photo'
 @router.message(UploadPhotoState.waiting_for_photo, F.photo)
 async def handle_photo(message: Message, state: FSMContext):
-    
+
     # Скачиваем изображение
     photo = message.photo[-1]   # берём изображение максимального разрешения
 
@@ -172,8 +220,7 @@ async def handle_text_input(message: Message, state: FSMContext):
 
     if not is_valid:
         # Отправка сообщения о проблеме
-        await message.answer(f"{validation_message}\n\n"
-                             f"🔁 Убедитесь, что вы указали все ингредиенты, как они указаны в составе, и попробуйте ещё раз:")
+        await message.answer(validation_message)
         
         await state.clear()
         await state.set_state(TextInputState.waiting_for_text)
@@ -195,7 +242,8 @@ async def handle_text_input(message: Message, state: FSMContext):
 
 # Обработка опции "Персональные рекомендации"
 @router.message(lambda message: message.text == "Персональные рекомендации")
-async def personal_rec(message: Message):
+async def personal_rec(message: Message, state: FSMContext):
+    await state.clear()
     await message.answer("Выберите действие для персональных рекомендаций:", reply_markup=kb.personal_rec_menu)
 
 
@@ -203,6 +251,7 @@ async def personal_rec(message: Message):
 # [SUB] Вопрос 1:
 @router.callback_query(lambda c: c.data == "get_skin_type")
 async def get_skin_type(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await callback.message.answer("Пройдите тест, чтобы определить ваш тип кожи и её особенности:")
     await callback.message.answer("Вопрос 1: Какие ощущения испытывает ваша кожа после умывания?\n\nA) Дискомфорт отсутствует, кожа свежая, сияющая.\n\nB) Появляется чувство стянутости, сухость, дискомфорт.\n\nC) Уже через 20 минут после умывания появляется незначительный жирный блеск лица.\n\nD) После умывания появляется чрезмерный блеск лица в Т-зоне, область щек остается матовой.",
                                   reply_markup=kb.response_4_options)
@@ -211,6 +260,7 @@ async def get_skin_type(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 2:
 @router.callback_query(SkinTypeTest.question_1)
 async def handle_question_1(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_1=callback.data)
     await callback.message.answer("Вопрос 2: Какие ощущения испытывает кожа, если пренебречь этапом её увлажнения?\n\nA) Не использую увлажняющий крем, без него кожа чувствует себя отлично.\n\nB) Увлажняющий крем - незаменимый этап моей бьюти-рутины, так как без него кожа сухая и стянутая.\n\nС) Без увлажнения жирный блеск лица усиливается.\n\nD) Без увлажнения жирный блеск лица усиливается в Т-зоне, область щек остается матовой.",
                                   reply_markup=kb.response_4_options)
@@ -219,6 +269,7 @@ async def handle_question_1(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 3:
 @router.callback_query(SkinTypeTest.question_2)
 async def handle_question_2(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_2=callback.data)
     await callback.message.answer("Вопрос 3: Свойственен ли для вашей кожи жирный блеск?\n\nA) Нет, жирный блеск отсутствует.\n\nB) Лёгкий жирный блеск появляется к концу дня.\n\nC) Да, присутствует на всем лице.\n\nD) Иногда жирный блеск появляется в Т-зоне.",
                                   reply_markup=kb.response_4_options)
@@ -243,6 +294,7 @@ async def handle_question_4(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 6:
 @router.callback_query(SkinTypeTest.question_5)
 async def handle_question_5(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_5=callback.data)
     await callback.message.answer("Вопрос 6: Как ваша кожа реагирует на пребывание на морозе?\n\nA) Появляется румянец или легкое шелушение.\n\nB) Кожа краснеет, появляется сухость и раздражение.\n\nC) Уменьшение жирного блеска.\n\nD) Меньше жирного блеска в Т-зоне; на щеках появляется ощущение стянутости.",
                                   reply_markup=kb.response_4_options)
@@ -251,6 +303,7 @@ async def handle_question_5(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 7:
 @router.callback_query(SkinTypeTest.question_6)
 async def handle_question_6(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_6=callback.data)
     await callback.message.answer("Вопрос 7: Как ваша кожа реагирует на жару?\n\nA) Появляется легкий блеск.\n\nB) На коже появляются шелушения, покраснения или зуд.\n\nC) Жирный блеск усиливается на всем лице.\n\nD) Жирный блеск появляется только в Т-зоне.",
                                   reply_markup=kb.response_4_options)
@@ -259,6 +312,7 @@ async def handle_question_6(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 8:
 @router.callback_query(SkinTypeTest.question_7)
 async def handle_question_7(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_7=callback.data)
     await callback.message.answer("Вопрос 8: Как часто у вас появляются акне?\n\nA) Никогда. На моей коже нет высыпаний акне.\n\nB) Появляются в период менструации.\n\nC) Появляются после вредной еды.\n\nD) Постоянно, на лице всегда есть акне и воспаления.",
                                   reply_markup=kb.response_4_options)
@@ -267,6 +321,7 @@ async def handle_question_7(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 9:
 @router.callback_query(SkinTypeTest.question_8)
 async def handle_question_8(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_8=callback.data)
     await callback.message.answer("Вопрос 9: Есть ли у Вас следы постакне?\n\nA) Да, есть пятна и рубцы (шрамы от прыщей).\n\nB) Нет, на моём лице нет следов постакне.",
                                   reply_markup=kb.response_2_options)
@@ -275,6 +330,7 @@ async def handle_question_8(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 10:
 @router.callback_query(SkinTypeTest.question_9)
 async def handle_question_9(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_9=callback.data)
     await callback.message.answer("Вопрос 10: Заметны ли на Вашем лице морщины?\n\nA) Нет, на моём лице нет морщин.\n\nB) Да, на моём лице есть лёгкие поверхностные морщинки.\n\nC) Да, на моём лице есть неглубокие мимические морщины.\n\nD) Да, на моём лице есть глубокие возрастные морщины.",
                                   reply_markup=kb.response_4_options)
@@ -283,6 +339,7 @@ async def handle_question_9(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 11:
 @router.callback_query(SkinTypeTest.question_10)
 async def handle_question_10(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_10=callback.data)
     await callback.message.answer("Вопрос 11: Заметны ли на вашем лице покраснения или тонкая сосудистая сеточка на щеках, крыльях носа, скулах?\n\nA) Нет, у меня нет такой проблемы.\n\nB) Да, у меня есть покраснения на лице.",
                                   reply_markup=kb.response_2_options)
@@ -291,6 +348,7 @@ async def handle_question_10(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 12:
 @router.callback_query(SkinTypeTest.question_11)
 async def handle_question_11(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_11=callback.data)
     await callback.message.answer("Вопрос 12: Есть ли у вас следы недосыпа или отечностей по утрам?\n\nA) Нет.\n\nB) Да, есть.",
                                   reply_markup=kb.response_2_options)
@@ -299,6 +357,7 @@ async def handle_question_11(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вопрос 13:
 @router.callback_query(SkinTypeTest.question_12)
 async def handle_question_12(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_12=callback.data)
     await callback.message.answer("Вопрос 13: Вы беременны или планируете беременность?\n\nA) Нет.\n\nB) Да, я беременна в данный момент.\n\nC) Да, я планирую беременность в скором времени.",
                                   reply_markup=kb.response_3_options)
@@ -307,9 +366,10 @@ async def handle_question_12(callback: CallbackQuery, state: FSMContext):
 # [SUB] Вывод результата теста:
 @router.callback_query(SkinTypeTest.question_13)
 async def handle_question_13(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
     await state.update_data(answer_13=callback.data)
     await state.set_state(SkinTypeTest.calculating_result)
-                                  
+
     # Получение данных из состояния
     user_data = await state.get_data()
     skin_type, features, risks = await determine_skin_type(user_data)
@@ -338,12 +398,16 @@ async def handle_question_13(callback: CallbackQuery, state: FSMContext):
 # Обработка опции "Персональные рекомендации" -> "Узнать свой тип кожи" -> "Самостоятельно определить тип кожи"
 @router.callback_query(lambda c: c.data == "show_skin_test")
 async def show_skin_test(callback: CallbackQuery):
+    await callback.answer()
     await callback.message.answer(f'Чтобы самостоятельно определить тип кожи, проведите несложный тест:\n\t1. Начните с очищения кожи. Умойтесь вашим привычным гелем или пенкой и не используйте дополнительно никакие увлажняющие средства.\n\t2. Подождите около 30-40 минут, пока сальные железы не начнут вырабатывать кожный жир\n\t3. Приложите к Т-зоне и щекам папиросную бумагу или салфетки для удаления жирного блеска. Подержите их примерно две минуты.\n\nГотовы оценить результаты?\n\t1. Если все участки кожи оставили обильный жирный след – вероятно, у вас жирный тип кожи.\n\t2. След остался только на бумаге, расположенной в Т-зоне? Ваша кожа, скорей всего, комбинированная.\n\t3. Если вы заметили следы на всех кусочках бумаги, но они не ярко выраженные, то у вас нормальная кожа.\n\t4. Если на салфетке нет никаких следов - кожа сухая.\n\nТочно определить тип кожи при помощи тестирования достаточно сложно. Если Вы хотите получить достоверные данные на счёт особенностей Вашей кожи, рекомендуем обратиться к специалисту.\n\n\nИсточник: https://www.loreal-paris.ru/blog/kak-opredelit-tip-kozhi-lica')
 
 
 # Обработка опции "Персональные рекомендации" -> "Получить рекомендации"
 @router.callback_query(lambda c: c.data == "get_recommendations")
-async def get_recommendations(callback: CallbackQuery):
+async def get_recommendations(callback: CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await state.clear()
+
     tg_id = callback.from_user.id
     skin_type, features, risks = get_user_data(tg_id)
 
@@ -355,12 +419,12 @@ async def get_recommendations(callback: CallbackQuery):
     else:
         # Запрос к модели
         print("[LOG] Запрос к модели")
-        await callback.message.answer("Учёл все особенности вашей кожи!\n\nУже готовлю для вас рекомендации! Это займёт не более 20 секунд:)")
+        await callback.message.answer("Учёл все особенности вашей кожи!\n\nУже готовлю для вас рекомендации! Это займёт не более 20 секунд :)")
         recommendations = await get_result_message(skin_type, features, risks)
 
         # Форматирование ответа
         if recommendations == "error3":
-            await callback.message.answer("Произошла ошибка при получении рекомендаций. Попробуйте позже.")
+            await callback.message.answer("Произошла ошибка при получении рекомендаций. Пожалуйста, попробуйте ещё раз!")
         else:
             await callback.message.answer(
                 f"Вот персональные рекомендации средств ухода за вашим типом кожи:\n\n{recommendations}"
@@ -373,9 +437,13 @@ async def get_recommendations(callback: CallbackQuery):
 @router.message(F.text)
 async def handle_other_commands(message: Message, state: FSMContext):
     await state.clear()
-    if message.text == "Персональные рекомендации":
-        await personal_rec(message)
-    else: 
+    if message.text == "/start":
+        await cmd_start(message, state)
+    elif message.text == "Персональные рекомендации":
+        await personal_rec(message, state)
+    elif message.text == "Начать анализ":
+        await start_analysis(message, state)
+    else:
         return False
     
     return True
