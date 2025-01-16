@@ -11,6 +11,7 @@ from .helpers.skin_test import determine_skin_type
 from .services.cropper import crop_object_async
 from .services.find_func import analyze_ingredients
 from .services.personal_rec_request import get_result_message
+from .services.llama_request import query_llm
 from .helpers.get_user_skin_data import get_user_data
 from .helpers.ingredient_invalidation import is_valid_ingredients_text
 from .helpers.create_pdf import create_pdf
@@ -41,6 +42,56 @@ class SkinTypeTest(StatesGroup):
     question_12 = State()
     question_13 = State()
     calculating_result = State()
+
+class LLMNavigationState(StatesGroup):
+    waiting_for_instruction = State()
+
+# Обработка команды /navigate
+@router.message(Command("navigate"))
+async def navigate(message: Message, state: FSMContext):
+    """
+    Начинает работу LLM-агента для управления функциями.
+    """
+    await state.set_state(LLMNavigationState.waiting_for_instruction)
+    await message.answer("Жду ваших инструкций!")
+
+# [SUB] Обработка инструкций в состоянии LLMNavigationState
+@router.message(LLMNavigationState.waiting_for_instruction)
+async def handle_llm_instruction(message: Message, state: FSMContext):
+    state.clear()
+    """
+    Обрабатывает запросы пользователя через LLM и выполняет соответствующую функцию.
+    """
+    user_input = message.text
+
+    # Запрос к LLM для определения действия
+    prompt = f"""
+    Пользователь сказал: "{user_input}". Выбери одно из действий:
+    1. upload_photo - Анализировать состав по фото.
+    2. text_input - Анализ текста состава.
+    3. get_skin_type - Определить тип/состояние кожи.
+    4. get_recommendations - Получить рекомендации по уходу.
+    Верни только название действия (upload_photo, text_input, get_skin_type, get_recommendations).
+    """
+    action = query_llm(prompt).strip()
+
+    if "upload_photo" in action:
+        await message.answer("Загрузите фото состава для анализа")
+        await state.set_state(UploadPhotoState.waiting_for_photo)
+
+    elif "text_input" in action:
+        await state.set_state(TextInputState.waiting_for_text)
+        await message.answer("Введите состав вашего средства для анализа:")
+
+    elif "get_skin_type" in action:
+        await message.answer("Пройдите тест, чтобы определить ваш тип кожи и её особенности:")
+        await message.answer("Вопрос 1: Какие ощущения испытывает ваша кожа после умывания?\n\nA) Дискомфорт отсутствует, кожа свежая, сияющая.\n\nB) Появляется чувство стянутости, сухость, дискомфорт.\n\nC) Уже через 20 минут после умывания появляется незначительный жирный блеск лица.\n\nD) После умывания появляется чрезмерный блеск лица в Т-зоне, область щек остается матовой.",
+                                  reply_markup=kb.response_4_options)
+        await state.set_state(SkinTypeTest.question_1)    
+
+    else:
+        await message.answer(f"Не удалось распознать действие. Попробуйте ещё раз.")
+
 
 # Обработка команды /start
 @router.message(CommandStart())
