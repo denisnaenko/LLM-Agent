@@ -1,6 +1,5 @@
 import aiosqlite
 from .ocr_processor import ocr_func
-from .organize_text import get_organized_text
 
 async def get_ingredients_str(text):
     """
@@ -305,13 +304,6 @@ async def get_ingredients_dict(db_name, ingredients_str, is_sepated=False):
     return ingredients, is_recognized, ingredients_dict
 
 async def get_ingredients_info(db_name, ingredients, is_recognized, ingredients_dict):
-    # ingredients список строк - список исходных ингредиентов
-    # is_recognized список из True/False для каждого исходного ингредиента
-    # ingredients_dict = {i: [ingredient, idx, name, found_by], ...}
-
-    # уже поискали в базе и есть результаты
-    # получаем непосредственно данные из базы, а не просто айди
-
     result_dict = dict()
     recognized_names = []
     for i in ingredients_dict.keys():
@@ -334,6 +326,48 @@ async def get_ingredients_info(db_name, ingredients, is_recognized, ingredients_
         else:
             result_dict[i] = [ingredients[i], is_recognized[i]]
     return result_dict
+
+async def format_ingredients(ingredients_info):
+    """Форматирует информацию об ингредиентах в удобочитаемый вид."""
+
+    name = ingredients_info[0].strip()
+    synonyms = [s.strip() for s in ingredients_info[1:4] if s.strip()]  # Убираем пустые строки
+    description = ingredients_info[4].strip()
+    sources = ingredients_info[5].strip() or "Информация отсутствует" # Обработка пустой строки
+    effect = ingredients_info[6].strip()
+    roles = [r.strip() for r in ingredients_info[7].split('; ') if r.strip()] # Обработка и разделение ролей
+    dangers = [d.strip() for d in ingredients_info[8].split('; ') if d.strip()] #Обработка и разделение опасностей
+    roles_sep = '\n  - '.join(roles)
+    synonyms_sep = '\n  - '.join(synonyms)
+    dangers_sep = '\n  -> '.join(dangers)
+
+    output = f"""
+Название: {name}
+
+Синонимы:
+{'  - ' + synonyms_sep if synonyms else 'Информация отсутствует'}
+
+Описание:
+{description}
+
+Источники:
+{sources}
+
+Эффект:
+{'  - ' + effect if effect else '  - Нет эффекта'}
+
+Роли:
+{'  - ' + roles_sep if roles else 'Информация отсутствует'}
+
+Опасность:
+{'  -> ' + dangers_sep  if dangers else 'Информация отсутствует'}
+
+---
+
+""" 
+
+    return output
+
 
 async def analyze_ingredients(text=None):
     db_name = "ingredients.db"
@@ -361,21 +395,18 @@ async def analyze_ingredients(text=None):
                 else:
                     if 'запрещен' in ingredients_info[i][8].lower():
                         dangerous.append(ingredients_info[i][2])
-
-                        total_msg += f"Опасен: {ingredients_info[i]}\n\n"
+                        total_msg += f"Опасен: {await format_ingredients(ingredients_info[i])}\n\n"
                     else:
                         not_recommended.append(ingredients_info[i][2])
-                        total_msg += f"Применять с осторожностью: {ingredients_info[i]}\n\n"
-
-
+                        total_msg += f"Применять с осторожностью: {await format_ingredients(ingredients_info[i])}\n\n"
+                        
+                        
     if len(dangerous) >= 1:
         conclusion = "Ваше средство опасно для кожи!"
     elif len(not_recommended) >= 1:
         conclusion = "Ваше средство может иметь индивидуальные противопоказания!"
     else:
         conclusion = "Ваше средство безопасно!"
-
-    total_msg = await get_organized_text(total_msg)
     
     return (
         f"Найдено опасных для кожи ингредиентов: {len(dangerous)}!\n"
