@@ -148,7 +148,8 @@ async def handle_global_navigation(message: Message, state: FSMContext):
     6. Запрос: "ааа фвафва ываывавы" → Ответ: None
     7. Запрос: "INGREDIENTS: Glycerin, Aqua (Hungarian Thermal Water), Silt (Hungarian Mud), Copper Gluconate, Cetearyl Olivate, Lava Powder, Sorbitan Olivate" → Ответ: None
     """
-    action = query_llm(prompt).strip()
+    action = await query_llm(prompt)
+    action.strip()
 
     if "upload_photo" in action:
         await state.clear()
